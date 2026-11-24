@@ -2286,6 +2286,7 @@
       const enteredHash = await hashText(pass);
       if(enteredHash !== TEACHER_PASSCODE_HASH){ toast('Clave de acceso incorrecta.'); return; }
       state.teacherName = name;
+      try{ localStorage.setItem('av_teacher_session', JSON.stringify({name:name, h:enteredHash})); }catch(e){}
       state.view='teacherDash';
       state.teacherTab='crear';
       state.teacherGateOpen=false;
@@ -2371,6 +2372,7 @@
     },
 
     logout(){
+      try{ localStorage.removeItem('av_teacher_session'); }catch(e){}
       this.stopExamTimer();
       this.stopLockTimer();
       this.stopFeedbackTimer();
@@ -3079,6 +3081,18 @@
       AV.registerTabViolation();
     }
   });
+
+  /* Sesión docente recordada en este navegador (se borra con "Salir") */
+  try{
+    const saved = JSON.parse(localStorage.getItem('av_teacher_session')||'null');
+    if(saved && saved.h === TEACHER_PASSCODE_HASH && saved.name){
+      state.teacherName = saved.name;
+      state.view = 'teacherDash';
+      state.teacherTab = 'crear';
+      state.teacherGateOpen = false;
+      setTimeout(function(){ try{ AV.refreshExamList(); }catch(e){} }, 0);
+    }
+  }catch(e){}
 
   render();
 })();
