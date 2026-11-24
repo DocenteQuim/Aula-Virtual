@@ -514,6 +514,7 @@
     editingCreatedAt: null,
     dbData: [],
     dbFiltro: 'Todos',
+    historialFiltro: '',
     driveUrl: '',
     loading: false,
 
@@ -1494,13 +1495,14 @@
   }
 
   function viewTeacherDash(){
-    const tabs = [['crear','Crear examen'],['examenes','Mis exámenes'],['basedatos','Base de datos']];
+    const tabs = [['crear','Crear examen'],['examenes','Mis exámenes'],['historial','Historial'],['basedatos','Base de datos']];
     return `
       <div class="tabs">
         ${tabs.map(t=>`<button class="tab-btn ${state.teacherTab===t[0]?'active':''}" onclick="AV.setTeacherTab('${t[0]}')">${t[1]}</button>`).join('')}
       </div>
       ${state.teacherTab==='crear' ? tabCrear() : ''}
       ${state.teacherTab==='examenes' ? tabExamenes() : ''}
+      ${state.teacherTab==='historial' ? tabHistorial() : ''}
       ${state.teacherTab==='basedatos' ? tabBaseDatos() : ''}
       ${state.teacherTab==='resultados' ? tabResultados() : ''}
     `;
@@ -1739,6 +1741,36 @@
         <button class="btn btn-sm btn-block" style="margin-top:8px;background:#fdf0ea;color:var(--pen-dark);border:1px solid #eecfbd;" onclick="AV.deleteExam('${ex.codigo}','${esc(ex.titulo).replace(/'/g,"\\'")}')">🗑 Eliminar examen</button>
       </div>
     `).join('');
+  }
+
+  function tabHistorial(){
+    const list = (state.examList||[]).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const q = (state.historialFiltro||'').trim().toLowerCase();
+    const filtered = q ? list.filter(ex=>
+      (ex.docente||'').toLowerCase().includes(q) ||
+      (ex.titulo||'').toLowerCase().includes(q) ||
+      (ex.codigo||'').toLowerCase().includes(q)
+    ) : list;
+    return `
+      <div class="card">
+        <h2 class="section-title">Historial de exámenes creados</h2>
+        <p class="muted">Registro de quién subió cada examen, con fecha y hora, para control y trazabilidad.</p>
+        <input type="text" placeholder="Buscar por docente, título o código…" value="${esc(state.historialFiltro||'')}" oninput="AV.setHistorialFiltro(this.value)">
+      </div>
+      ${filtered.length===0 ? '<div class="card empty">No hay exámenes que coincidan.</div>' : `
+      <div class="card">
+        <table>
+          <tr><th>Fecha y hora</th><th>Docente</th><th>Examen</th><th>Curso</th><th>Código</th></tr>
+          ${filtered.map(ex=>`<tr>
+            <td style="white-space:nowrap;">${ex.createdAt ? esc(new Date(ex.createdAt).toLocaleString()) : '—'}</td>
+            <td>${esc(ex.docente || 'Sin nombre')}</td>
+            <td>${esc(ex.titulo)}</td>
+            <td>${esc(ex.curso)}</td>
+            <td><span class="code-box" style="display:inline-block;padding:2px 8px;font-size:12px;">${esc(ex.codigo)}</span></td>
+          </tr>`).join('')}
+        </table>
+      </div>`}
+    `;
   }
 
   function tabResultados(){
@@ -2236,13 +2268,18 @@
     setTeacherTab(tab){
       state.teacherTab=tab;
       render();
-      if(tab==='examenes') this.refreshExamList();
+      if(tab==='examenes' || tab==='historial') this.refreshExamList();
       if(tab==='basedatos') this.refreshDb();
+    },
+
+    setHistorialFiltro(v){
+      state.historialFiltro = v;
+      render();
     },
 
     async refreshExamList(){
       state.examList = await listExams();
-      if(state.teacherTab==='examenes') render();
+      if(state.teacherTab==='examenes' || state.teacherTab==='historial') render();
     },
 
     async refreshDb(){
