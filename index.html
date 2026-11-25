@@ -1671,11 +1671,6 @@
         <input type="text" id="sCode" placeholder="Ej. 7K9QRT" maxlength="8" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:3px;font-family:'JetBrains Mono',monospace;font-weight:700;" onkeydown="if(event.key==='Enter')AV.enterStudent()">
         <button class="btn btn-primary btn-block" style="font-size:15px;padding:14px;" onclick="AV.enterStudent()">Entrar a mi prueba →</button>
       </div>
-      <div class="card">
-        <h2 class="section-title">Escala institucional de desempeños</h2>
-        <p class="muted" style="margin-bottom:0;">Tu nota final (1.0 a 5.0) se ubica en uno de estos niveles.</p>
-        ${escalaHtml()}
-      </div>
       <div class="card" style="display:flex;gap:8px;flex-wrap:wrap;">
         <span class="chip">⏱ Cronómetro visible</span><span class="chip">🧪 Recursos: tabla periódica y calculadora</span><span class="chip">🔒 No cambies de pestaña</span>
       </div>
@@ -2182,46 +2177,20 @@
   }
 
   function viewStudentResult(){
-    const r = state.lastResult;
-    const exam = state.activeExam;
-    const items = state.examDisplayItems || exam.preguntas.map(q=>({type:'q', qid:q.id}));
-    const pages = state.examPages || [];
     const motivo = state.lastMotivo || 'normal';
-    let qNum = 0;
-    const feedbackHtml = items.map(it=>{
-      if(it.type==='bloque'){
-        const b = (exam.bloques||[]).find(x=>x.id===it.id);
-        return b ? blockViewCard(b, liveBlockHeader(b.id, pages)) : '';
-      } else {
-        qNum++;
-        const q = exam.preguntas.find(x=>x.id===it.qid);
-        if(!q) return '';
-        return feedbackCard(q, qNum);
-      }
-    }).join('');
-
     const motivoNote = motivo==='tiempo_agotado'
-      ? '<div class="warn">⏱ El examen se entregó automáticamente porque se agotó el tiempo.</div>'
+      ? '<p class="muted" style="text-align:center;">⏱ Se terminó el tiempo y tu prueba se envió automáticamente.</p>'
       : motivo==='bloqueo_pestana'
-      ? '<div class="warn">🔒 El examen se entregó automáticamente por salir de la pestaña más de una vez.</div>'
+      ? '<p class="muted" style="text-align:center;">Tu prueba se envió automáticamente al salir de la pantalla.</p>'
       : '';
-
-    const ft = state.feedbackTimer;
+    const nombre = (state.studentForm && state.studentForm.nombre ? String(state.studentForm.nombre).trim().split(/\s+/)[0] : '');
     return `
-      <div class="card">
+      <div class="hero" style="text-align:center;padding:34px 20px;">
+        <div style="font-size:56px;line-height:1;">✅</div>
+        <h2 style="margin-top:12px;">${nombre ? 'Gracias, '+esc(nombre)+'.' : 'Gracias.'}<br>Tu prueba se ha enviado</h2>
+        <p style="font-size:15px;margin:10px 0 4px;">Esperamos buenos resultados.<br>Tus respuestas se enviarán a tu docente.</p>
+        <p class="muted" style="margin:14px 0 0;">Hiciste tu mayor esfuerzo, y eso es lo que cuenta. Ya puedes descansar y cerrar esta pantalla. 🌱</p>
         ${motivoNote}
-        ${(()=>{const d=desempeno(r.nota);return `<div class="result-hero"><div class="big" style="color:var(--teal);">${formatNota(r.nota)}</div>${d?`<span class="lvl d-${d.id}">Desempeño ${d.nombre}</span>`:''}</div>`;})()}
-        ${escalaHtml()}
-        <p class="muted" style="text-align:center;">Respondiste correctamente ${r.correctas} de ${r.total} preguntas.</p>
-      </div>
-      <div class="card">
-        <h2 class="section-title">Tus respuestas</h2>
-        ${ft.visible ? `
-          <p class="fb-countdown">👀 Disponible por <span id="fbCountdownText">${ft.countdown}</span> segundos más — no la compartas con tus compañeros.</p>
-          ${feedbackHtml}
-        ` : `
-          <div class="empty">⏱ El tiempo para ver el detalle de tus respuestas terminó.<br>Tu nota final ya quedó guardada arriba.</div>
-        `}
       </div>
       <div class="card">
         <button class="btn btn-outline btn-block" onclick="AV.logout()">Finalizar</button>
@@ -2971,7 +2940,6 @@
       state.lastMotivo = motivo || 'normal';
       state.view='studentResult';
       render();
-      this.startFeedbackTimer();
     },
 
     exportExam(codigo){
