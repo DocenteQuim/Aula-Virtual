@@ -2305,6 +2305,7 @@
       state.examPageIndex = (draft && typeof draft.examPageIndex==='number') ? Math.min(draft.examPageIndex, state.examPages.length-1) : 0;
       state.examStartedAt = (draft && draft.inicio) ? draft.inicio : Date.now();
       state.examLock = { violations:0, locked:false, countdown:0, intervalId:null };
+      this.stopExamTimer();
       state.examTimer = { remaining:0, intervalId:null };
       state.submitting = false;
       state.view='studentExam';
@@ -2361,29 +2362,43 @@
     startExamTimer(){
       const exam = state.activeExam;
       if(!exam || !exam.tiempoLimite){ return; }
-      const transcurrido = Math.floor((Date.now() - (state.examStartedAt||Date.now()))/1000);
-      state.examTimer.remaining = Math.max(exam.tiempoLimite*60 - transcurrido, 0);
+      // Siempre detener cualquier cronómetro anterior (evita relojes duplicados que "corren más rápido")
+      clearInterval(state.examTimer.intervalId);
+      state.examTimer.intervalId = null;
+      // El tiempo restante se calcula SIEMPRE con la hora real del dispositivo (fin = inicio + límite),
+      // no restando 1 por tick: así no se acelera ni se atrasa aunque el navegador pause o duplique timers.
+      const finMs = (state.examStartedAt||Date.now()) + exam.tiempoLimite*60*1000;
+      const calc = ()=> Math.max(Math.ceil((finMs - Date.now())/1000), 0);
+      state.examTimer.remaining = calc();
       if(state.examTimer.remaining<=0){
         toast('El tiempo de este examen ya se agotó. Entregando…');
         this.submitExam(true,'tiempo_agotado');
         return;
       }
-      clearInterval(state.examTimer.intervalId);
-      state.examTimer.intervalId = setInterval(()=>{
-        state.examTimer.remaining--;
+      const tick = ()=>{
+        state.examTimer.remaining = calc();
         const el2 = document.getElementById('examTimerText');
         if(el2){
-          el2.textContent = formatTime(Math.max(state.examTimer.remaining,0));
+          el2.textContent = formatTime(state.examTimer.remaining);
           el2.parentElement.style.color = state.examTimer.remaining<=60 ? '#ff9d8a' : '';
         }
         if(state.examTimer.remaining<=0){
           clearInterval(state.examTimer.intervalId);
+          state.examTimer.intervalId = null;
           toast('Tiempo agotado. Entregando examen…');
           this.submitExam(true,'tiempo_agotado');
         }
-      },1000);
+      };
+      state.examTimer.intervalId = setInterval(tick,1000);
+      // Al volver a la pestaña (o reactivar la pantalla) se corrige de inmediato
+      if(!this._timerVis){
+        this._timerVis = true;
+        document.addEventListener('visibilitychange', ()=>{
+          if(!document.hidden && state.view==='studentExam' && state.examTimer.intervalId){ try{ tick(); }catch(e){} }
+        });
+      }
     },
-    stopExamTimer(){ clearInterval(state.examTimer.intervalId); },
+    stopExamTimer(){ clearInterval(state.examTimer.intervalId); state.examTimer.intervalId = null; },
 
     // Da 2 advertencias (no solo 1) antes de entregar automáticamente: salir de la pestaña
     // puede pasar sin querer (una llamada, una notificación, que se apague la pantalla),
